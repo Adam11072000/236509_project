@@ -1,0 +1,17 @@
+name: 236509_prj
+channels:
+  - pytorch
+  - conda
+  - defaults
+dependencies:
+  - python
+  - pip
+  - tqdm
+  - numpy
+  - tabulate
+  - scipy
+  - pytorch
+  - torchvision
+  - matplotlib
+  - scikit-learn
+
