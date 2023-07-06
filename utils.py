@@ -2,6 +2,7 @@ import torch
 import random
 import struct
 
+device = "cuda" if torch.cuda.is_available() else "cpu"
 
 def flatten_dict_into_list(nested_dict):
     flattened_dict = []
@@ -71,7 +72,7 @@ def generate_random_indices(tensor_shape, cap, distribution='uniform'):
         raise ValueError("Tensor must have at least 2 dimensions.")
     
     # Initialize the boolean tensor with all elements set to False
-    indices = torch.zeros(tensor_shape, dtype=torch.bool)
+    indices = torch.zeros(tensor_shape, dtype=torch.bool, device=device)
     
     # Flatten the last two dimensions for index calculation
     flat_size = tensor_shape[-2] * tensor_shape[-1]
@@ -105,32 +106,30 @@ def generate_random_indices(tensor_shape, cap, distribution='uniform'):
 
     return indices
 
-def float_to_int_repr(f):
-    """Converts a float number to its 32-bit integer representation"""
-    return struct.unpack('!I', struct.pack('!f', f))[0]
 
-def int_repr_to_float(i):
-    """Converts a 32-bit integer representation to a float number"""
-    return struct.unpack('!f', struct.pack('!I', i))[0]
+import numpy as np
 
-def flip_bit(number, bit_position):
-    """Flips a particular bit of an integer"""
-    return number ^ (1 << bit_position)
+def float_to_int32(tensor):
+    tensor_as_int = np.frombuffer(tensor.cpu().detach().numpy().tobytes(), dtype=np.int32)
+    return torch.tensor(tensor_as_int, dtype=torch.int32).to(device)
+
+def int32_to_float(tensor):
+    tensor_as_float = np.frombuffer(tensor.cpu().detach().numpy().tobytes(), dtype=np.float32)
+    return torch.tensor(tensor_as_float, dtype=torch.float32).to(device)
 
 def bitwise_xor_on_floats(target_indices, target, xor_mask):
     # Ensure the input tensors have the same shape    
+    tmp = target.clone()
     orig_shape = target_indices.shape
 
-    target_indices = torch.flatten(target_indices).detach()
-    target = torch.flatten(target).detach()
-    assert len(target.shape) == 1, "fuck"
-    target.apply_(float_to_int_repr)
-    result = []
-    for xor, el in zip(target_indices, target):
-        if not xor:
-            print(el.dtype)
-            result.append(el)
-        else:
-            result.append(el ^ xor_mask)
-    result = torch.tensor(result).reshape(orig_shape).apply_(int_repr_to_float)
-    return result
+    # Ensure that shapes match
+    assert target_indices.shape == tmp.shape, "Input tensors should have the same shape"
+
+    # Convert the float tensor to 32-bit integer representation
+    target_int = float_to_int32(tmp)
+
+    # Perform bitwise XOR between the integer representations for selected indices
+    target_int[target_indices.flatten()] ^= xor_mask
+
+    # Convert the result back to float representation
+    return int32_to_float(target_int).reshape(orig_shape)

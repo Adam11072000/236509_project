@@ -27,7 +27,9 @@ def trainSetLoader(batch_size):
 import copy
 
 if __name__ == "__main__":
-    model = torchvision.models.resnet18(pretrained=True)
+    model = torchvision.models.resnet18()
+    state_dict = torch.load("model_82.07.pth")
+    model.load_state_dict(state_dict)
     model.eval()
 
     criterion = nn.CrossEntropyLoss()
@@ -35,18 +37,22 @@ if __name__ == "__main__":
     momentum = 0.95
     optimizer = optim.SGD(model.parameters(), lr=lr, momentum=momentum)
     trainer = ResNetTrainer(model, criterion, optimizer, device)
-    train_loader, test_loader = trainSetLoader(32)
-    trainer.fit(train_loader, test_loader, 10)
+    _, test_loader = trainSetLoader(32)
+    #trainer.fit(None, test_loader, 1)
     sub_modules = flatten_dict_into_list(parse_submodules(model))
-    injector = FaultInjector(model, [FaultModel(
-        layer_name=sub_modules[3],
-        fault_target="weight",
-        num_faults=0,
-        fault_option="strict",
-        num_bits_to_flip=1,
-        target_bits=(30)
-    )])
-    injector.inject_faults()
-    trainer2 = ResNetTrainer(injector.model, criterion, optimizer, device)
-    trainer2.fit(None, test_loader, 1)
+    test_Acc = []
+    for i in range(0, 100):
+        copied = copy.deepcopy(model)
+        injector = FaultInjector(copied, [FaultModel(
+            layer_name=sub_modules[0],
+            fault_target="weight",
+            num_faults=50,
+            fault_option="non-strict",
+            num_bits_to_flip=8
+        )])
+        injector.inject_faults()
+        trainer2 = ResNetTrainer(injector.model, criterion, optimizer, device)
+        num_epochs, train_loss, train_acc, test_loss, test_acc = trainer2.fit(None, test_loader, 1)
+        test_Acc.append(test_acc)
+    print(min(test_Acc))
 

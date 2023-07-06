@@ -67,13 +67,12 @@ class FaultInjector():
             if target is None:
                 raise Exception()
             target_indices = generate_random_indices(target.shape, fault.num_faults, fault.fault_distribution)
-            print(target_indices.sum().item())
             if target.dtype.__str__().find("float") != -1:
                 func = torch.finfo
             else:
                 func = torch.iinfo
-            xor_mask = generate_xor_mask(func(target.dtype).bits, 0, 1, fault.num_bits_to_flip, fault.fault_distrubution_per_target)
+            xor_mask = generate_xor_mask(func(target.dtype).bits, 0, func(target.dtype).bits - 1, fault.num_bits_to_flip, fault.fault_distrubution_per_target)
             #xor_mask = generate_xor_mask(func(target.dtype).bits, fault.num_bits_to_flip, fault.fault_distrubution_per_target)
             target = bitwise_xor_on_floats(target_indices, target, xor_mask)
-            print(torch.sub(target, eval(f"self.model.{fault.layer_name}.{fault.fault_target}")))
-            setattr(eval(f"self.model.{fault.layer_name}.{fault.fault_target}"), "data", target)
+            self.model.conv1.weight.data = target
+            #setattr(eval(f"self.model.{fault.layer_name}.{fault.fault_target}"), "data", target)

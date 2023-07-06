@@ -74,6 +74,7 @@ class Trainer(abc.ABC):
         dl_test: DataLoader,
         num_epochs,
         print_every=1,
+        save=False,
         **kw,
     ) -> FitResult:
         """
@@ -121,7 +122,8 @@ class Trainer(abc.ABC):
 
             if best_acc is None or test_result.accuracy > best_acc:
                 best_acc = test_result.accuracy
-                torch.save(self.model.state_dict(), 'model_%s.pth' % best_acc)
+                if save:
+                    torch.save(self.model.state_dict(), 'model_%s.pth' % best_acc)
 
 
             # ========================
