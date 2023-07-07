@@ -68,43 +68,35 @@ def generate_xor_mask(total_bits, min_bit, max_bit, num_bits_to_flip, distributi
 
                
 def generate_random_indices(tensor_shape, cap, distribution='uniform'):
-    if len(tensor_shape) < 2:
-        raise ValueError("Tensor must have at least 2 dimensions.")
+    if len(tensor_shape) < 1:
+        raise ValueError("Tensor must have at least 1 dimension.")
+    
+    # Calculate the total number of elements in the tensor
+    total_elements = 1
+    for dim_size in tensor_shape:
+        total_elements *= dim_size
     
     # Initialize the boolean tensor with all elements set to False
-    indices = torch.zeros(tensor_shape, dtype=torch.bool, device=device)
+    indices = torch.zeros(total_elements, dtype=torch.bool, device=device)
     
-    # Flatten the last two dimensions for index calculation
-    flat_size = tensor_shape[-2] * tensor_shape[-1]
-
     # Generate random indices based on the specified distribution
     if distribution == 'uniform':
-        num_indices = min(cap, flat_size)
-        rand_indices = torch.randperm(flat_size)[:num_indices]
+        num_indices = min(cap, total_elements)
+        rand_indices = torch.randperm(total_elements, device=device)[:num_indices]
     elif distribution == 'gaussian':
-        num_indices = min(cap, flat_size)
-        while True:
-            rand_indices = torch.normal(mean=flat_size / 2, std=flat_size / 4, size=(num_indices,)).long()
-            rand_indices = rand_indices[rand_indices >= 0]
-            rand_indices = rand_indices[rand_indices < flat_size]
-            if len(rand_indices) >= num_indices:
-                rand_indices = rand_indices[:num_indices]
-                break
+        num_indices = min(cap, total_elements)
+        rand_indices = torch.round(torch.normal(mean=total_elements / 2, std=total_elements / 4, size=(num_indices,))).long()
+        rand_indices = rand_indices[(rand_indices >= 0) & (rand_indices < total_elements)]
     else:
         raise ValueError("Invalid distribution. Only 'uniform' and 'gaussian' distributions are supported.")
     
-    for index in rand_indices:
-        # Randomly select indices for the first dimensions
-        rand_first_dims = tuple(random.randrange(0, dim) for dim in tensor_shape[:-2])
-        
-        # Convert linear index to subscript for the last two dimensions
-        row = index // tensor_shape[-1]
-        col = index % tensor_shape[-1]
-        
-        # Set the index to True
-        indices[rand_first_dims + (row, col)] = True
+    # Set the selected indices to True
+    indices[rand_indices] = True
 
-    return indices
+    # Reshape the boolean tensor to the original shape
+    return indices.view(*tensor_shape)
+
+
 
 
 import numpy as np
