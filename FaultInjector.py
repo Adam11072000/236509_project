@@ -1,10 +1,10 @@
 import torch
-from utils import bitwise_xor_on_floats, generate_random_indices, generate_xor_mask
+from utils import bitwise_xor_on_floats, generate_random_indices, generate_xor_mask, build_module_dict, replace_submodule_with_faulty
 
 
 
 #FAULT_TARGET = ["weight", "bias", "memory"] # also need number of cells to inject fault into
-FAULT_TARGET = ["weight", "bias"] # also need number of cells to inject fault into
+FAULT_TARGET = ["weight", "bias", "memory"] # also need number of cells to inject fault into
 FAULT_OPTIONS = ["strict", "non-strict"] # strict indicates 1 bit, non-strict indicates multiple bit flips
 FAULT_MODE_PER_TARGET = ["random", "deterministic"] # fault type on data, either random faults across the martrices or deterministic faults
 RANDOM_DISTRIBUTIONS = ["gaussian", "uniform"]  #  geometric
@@ -20,7 +20,7 @@ class WrongParameters(Exception):
 class FaultModel():
     def __init__(self, layer_name, fault_target="weight", num_faults=1, fault_option="strict", num_bits_to_flip=1, fault_distribution="gaussian",
                      fault_mode_per_target="random", fault_distrubution_per_target="gaussian", target_bits=()) -> None:
-        if not layer_name:
+        if layer_name is None:
             raise WrongParameters("layer_name is not provided")
         if not fault_target or not fault_target in FAULT_TARGET:
             raise WrongParameters("fault_target parameter is wrong")
@@ -37,6 +37,7 @@ class FaultModel():
         self.target_bits = target_bits
         self.fault_mode_per_target = fault_mode_per_target
         self.layer_name = layer_name
+        self.done = False
     
     def __str__(self) -> str:
         representation = "layer_name-%s/%s/num-faults-%s/%s/bits-to-flip-%s/distribution-%s/target-mode-%s" % (self.layer_name, self.fault_target, 
@@ -47,7 +48,6 @@ class FaultModel():
             representation = representation + "/target-bits-%s" % self.target_bits
         return representation
 
-FAULT_DONE = False
 
 def inject_fault(target, fault_model):
     target_indices = generate_random_indices(target.shape, fault_model.num_faults, fault_model.fault_distribution)
@@ -60,35 +60,64 @@ def inject_fault(target, fault_model):
     return target
 
 
-def hook(module: torch.nn.Module, input: torch.tensor, fault_model: FaultModel):
-    print(module)
-    # modified_input = input.clone()
-    # FAULT_DONE = True
-    return input
+class FaultyModule(torch.nn.Module):
+    def __init__(self, original_module, fault_model):
+        super().__init__()
+        self.original_module = original_module
+        self.fault_model = fault_model
+        self.fault_model.done = False
 
-    
+    def forward(self, input):
+        if not self.fault_model.done:
+            input = inject_fault(input.clone(), self.fault_model)
+            self.fault_model.done = True
+        return self.original_module(input)
+
+
+def hook(module: torch.nn.Module, input: torch.tensor, output: torch.tensor, fault_model: FaultModel):
+    if fault_model.done == True:
+        return input
+    modified_input = inject_fault(input[0].clone(), fault_model)
+    input = list(input)
+    input[0] = modified_input
+    input = tuple(input)
+    fault_model.done = True
+    return modified_input
+
 
 class FaultInjector():
-    def __init__(self, model: torch.nn.Module, faults: list[FaultModel]) -> None:
+    def __init__(self, model: torch.nn.Module, fault: FaultModel) -> None:
         self.model = model
-        self.faults = faults
+        self.sub_modules = build_module_dict(model)
+        self.fault = fault
     
+    def set_submodule_fault_target(self, submodule_path, target_fault, new_tensor):
+        submodule_path_list = submodule_path.split('.')
+    
+        # Get the submodule by recursively accessing the attributes
+        submodule = self.model
+        for name in submodule_path_list:
+            submodule = getattr(submodule, name)
+        
+        # Update the weights of the submodule
+        for name, param in submodule.named_parameters():
+            if name == target_fault:
+                param.data = new_tensor
+                break
+        
     def inject_faults(self):
-        for fault in self.faults:
-            target_layer = eval("self.model.%s" % fault.layer_name)
-            if not target_layer.weight is None and fault.fault_target == "weight":
-                target = target_layer.weight
-            elif target_layer.bias is not None and fault.fault_target == "bias":
-                target = target_layer.bias
-            elif fault.fault_target == "memory":
-                hook_handle = target_layer.register_forward_hook(lambda module, input: hook(module, input, fault))
-                target = target_layer.input
-                FAULT_DONE = False
-                return True
-            else:
-                target = None
-            if target is None:
-                raise Exception()
-            
-            target = inject_fault(target, fault)
-            setattr(eval(f"self.model.{fault.layer_name}.{fault.fault_target}"), "data", target)
+        target = None
+        target_layer = self.sub_modules[self.fault.layer_name]
+        if self.fault.fault_target == "weight":
+            target = target_layer.weight
+        elif self.fault.fault_target == "bias":
+            target = target_layer.bias
+        elif self.fault.fault_target == "memory":
+            faulty_module = FaultyModule(target_layer, self.fault)
+            replace_submodule_with_faulty(self.model, self.fault.layer_name, faulty_module)
+            return
+        if target is None:
+            raise Exception()
+        
+        target = inject_fault(target, self.fault)
+        self.set_submodule_fault_target(self.fault.layer_name, self.fault.fault_target, target)

@@ -1,40 +1,8 @@
 import torch
 import random
-import struct
+import numpy as np
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-
-def flatten_dict_into_list(nested_dict):
-    flattened_dict = []
-    for key, value in nested_dict.items():
-        if isinstance(value, dict):
-            flattened_dict += flatten_dict_into_list(value)
-        else:
-            flattened_dict.append(key)
-    return flattened_dict
-
-def parse_submodules(module, prefix='', parent_is_subscriptable=True):
-    result = {}
-    for idx, (name, submodule) in enumerate(module.named_children()):
-        # Check if the submodule is subscriptable (e.g. nn.Sequential)
-        is_subscriptable = hasattr(submodule, '__getitem__')
-        
-        # Construct the access path
-        if parent_is_subscriptable:
-            new_prefix = f"{prefix}[{idx}]" if prefix else f"{name}"
-            access_path = f"{new_prefix}"
-        else:
-            new_prefix = f"{prefix}.{name}" if prefix else name
-            access_path = f"{new_prefix}"
-        
-        # If the submodule has children, recursively process them
-        children = dict(submodule.named_children())
-        if children:
-            result[access_path] = parse_submodules(submodule, new_prefix, is_subscriptable)
-        else:
-            result[access_path] = None
-    return result
-
 
 def generate_xor_mask(total_bits, min_bit, max_bit, num_bits_to_flip, distribution='uniform'):
     # Ensure that num_bits_to_flip, min_bit, and max_bit are valid
@@ -66,6 +34,18 @@ def generate_xor_mask(total_bits, min_bit, max_bit, num_bits_to_flip, distributi
     
     return xor_mask
 
+def build_module_dict(model):
+    module_dict = {}
+    for name, module in model.named_modules():
+        module_dict[name] = module
+    return module_dict
+
+def get_module_by_path(model, path):
+    parts = path.split('.')
+    curr_module = model
+    for part in parts:
+        curr_module = getattr(curr_module, part)
+    return curr_module
                
 def generate_random_indices(tensor_shape, cap, distribution='uniform'):
     if len(tensor_shape) < 1:
@@ -97,10 +77,6 @@ def generate_random_indices(tensor_shape, cap, distribution='uniform'):
     return indices.view(*tensor_shape)
 
 
-
-
-import numpy as np
-
 def float_to_int32(tensor):
     tensor_as_int = np.frombuffer(tensor.cpu().detach().numpy().tobytes(), dtype=np.int32)
     return torch.tensor(tensor_as_int, dtype=torch.int32).to(device)
@@ -125,3 +101,17 @@ def bitwise_xor_on_floats(target_indices, target, xor_mask):
 
     # Convert the result back to float representation
     return int32_to_float(target_int).reshape(orig_shape)
+
+def replace_submodule_with_faulty(module, submodule_path, faulty_module):
+    # Split the submodule path into a list of submodule names
+    submodule_path_list = submodule_path.split('.')
+    
+    # Get the parent module and the target submodule's name
+    parent_module = module
+    target_submodule_name = ''
+    for name in submodule_path_list[:-1]:
+        parent_module = getattr(parent_module, name)
+    target_submodule_name = submodule_path_list[-1]
+
+    # Set the target submodule to the faulty module
+    setattr(parent_module, target_submodule_name, faulty_module)
