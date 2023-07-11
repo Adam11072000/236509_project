@@ -9,6 +9,7 @@ from FaultInjector import FaultInjector, FaultModel, WrongParameters
 import argparse
 import json
 import os
+import robustbench
 
 
 parser = argparse.ArgumentParser()
@@ -27,10 +28,12 @@ parser.add_argument('-i', '--number_of_iterations_per_fault_model', type=int, de
                     help='Number of iterations per fault (must be higher than 0)')
 parser.add_argument('-id', '--worker_id', type=int, required=True,
                     help='ID of worker')
-
+parser.add_argument("--module", type=str, help="modules available at robustBench, provide them as <threat_model>@<model_name>\
+                    threat_model = [Linf, L2, corruptions, corruptions_3d]")
+parser.add_argument("--output_dir", type=str, help="Data output_dir")
 args = parser.parse_args()
 
-WORKERS_DIR = "./workers_data"
+WORKERS_DIR = "./workers_data" if not args.output_dir else args.output_dir
 TARGET_JSON = "%s/worker_data_%d.json" % (WORKERS_DIR, args.worker_id)
 
 if not os.path.isdir(WORKERS_DIR):
@@ -67,9 +70,15 @@ def trainSetLoader(batch_size):
 
     return testloader
 
-model = torchvision.models.resnet18()
-state_dict = torch.load("model_82.17.pth")
-model.load_state_dict(state_dict)
+if args.module:
+        model_name = args.module.split("@")[1]
+        thread_model = args.module.split("@")[0]
+        model = robustbench.utils.load_model(model_name=model_name, threat_model=thread_model, dataset="cifar10")
+else:  
+    # use one of my own, for testing purposes.  
+    model = torchvision.models.resnet18()
+    state_dict = torch.load("model_82.17.pth")
+    model.load_state_dict(state_dict)
 model.eval()
 
 criterion = nn.CrossEntropyLoss()
@@ -83,7 +92,8 @@ appened_accuracy = []
 overall_results = {}
 overall_results["fault_mode_%d" % args.worker_id] = copy.deepcopy(fault_model.__dict__())
 for i in range(0, args.number_of_iterations_per_fault_model):
-    injector = FaultInjector(model, fault_model)
+    copied = copy.deepcopy(model)
+    injector = FaultInjector(copied, fault_model)
     injector.inject_faults()
     trainer2 = ResNetTrainer(injector.model, criterion, optimizer, device)
     num_epochs, train_loss, train_acc, test_loss, test_acc = trainer2.fit(None, test_loader, 1)

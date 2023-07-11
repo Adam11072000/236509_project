@@ -1,24 +1,16 @@
 import torchvision
 import torch
-import torchvision.transforms as transforms
 from utils import build_module_dict
-from FaultInjector import FaultModel, FAULT_TARGET, FAULT_OPTIONS, FAULT_MODE_PER_TARGET, RANDOM_DISTRIBUTIONS
+from FaultInjector import FaultModel, FAULT_TARGET, FAULT_OPTIONS, FAULT_MODE_PER_TARGET, RANDOM_DISTRIBUTIONS, WrongParameters
 from scipy.stats import truncnorm
 import numpy as np
 import subprocess
 import argparse
-
-
-class WorkerFailed(Exception):
-    def __init__(self, msg, *args: object) -> None:
-        self.msg = msg
-        super().__init__(*args)
-    def __str__(self) -> str:
-        return self.msg
+import robustbench
 
 
 # Add the arguments
-parser = argparse.ArgumentParser(description='Process some integers.')
+parser = argparse.ArgumentParser(description='Arguments for the script. For the list of available models, check https://github.com/RobustBench/robustbench')
 
 parser.add_argument('-n', '--number_of_fault_models', type=int, default=1,
                     help='Number of fault models (must be higher than 0)')
@@ -28,8 +20,15 @@ parser.add_argument('-o', "--fault_option", type=str, default="non-strict", choi
                     help="strict or non-strict, i.e., 1/multiple bit flips per fault accordingly.")
 parser.add_argument("-m", "--fault_mode_per_target", type=str, default="random", choices=FAULT_MODE_PER_TARGET,
                     help='Fault mode per target (for bit flips), random or deterministic')
-parser.add_argument("-t", "--target_bits", nargs='*', default=[], help="The target bits. Provide multiple values separated by space. Default is an empty list.")
-
+parser.add_argument("-t", "--target_bits", nargs='*', default=[], 
+                    help="The target bits. Provide multiple values separated by space. Default is an empty list.")
+parser.add_argument("-l", "--layer_name", type=str, 
+                    help="The name of the layer.")
+parser.add_argument("-f", "--fault_target", choices=FAULT_TARGET,
+                    help="The target of the fault.")
+parser.add_argument("--module", type=str, help="modules available at robustBench, provide them as <threat_model>@<model_name>\
+                    threat_model = [Linf, L2, corruptions, corruptions_3d]")
+parser.add_argument("--output_dir", type=str, help="Data output directory")
 
 # Parse the arguments
 args = parser.parse_args()
@@ -47,6 +46,7 @@ if (args.fault_option == "strict" and len(args.target_bits) > 1) or \
 
 if args.fault_mode_per_target == "deterministic" and len(args.target_bits) == 0:
     parser.error("deterministic fault mdoe per target should have pre-chosen bits")
+
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -110,9 +110,16 @@ def generate_fault_models(supported_layers_per_fault_target: dict, num_fault_mod
             target_bits = args.target_bits
         target_bits = [int(bit) for bit in target_bits]
         fault_target = target_choices[i]
+        if args.fault_target is not None:
+            fault_target = args.fault_target
+        layer_name = np.random.choice(supported_layers_per_fault_target[fault_target], size=1)[0]["module_name"]
+        if args.layer_name is not None:
+            layer_name = args.layer_name
+            if not any(layer["module_name"] == layer_name for layer in supported_layers_per_fault_target[fault_target]):
+                raise WrongParameters("layer_name is not supported with given target")
         fault_models.append(
             FaultModel(
-                layer_name=np.random.choice(supported_layers_per_fault_target[fault_target], size=1)[0]["module_name"],
+                layer_name=layer_name,
                 fault_target=fault_target,
                 num_faults=num_faults,
                 fault_option=fault_option,
@@ -130,9 +137,16 @@ def generate_fault_models(supported_layers_per_fault_target: dict, num_fault_mod
 if __name__ == "__main__":
     number_of_fault_models = args.number_of_fault_models
     number_of_iterations_per_fault_model = args.number_of_iterations_per_fault
-    model = torchvision.models.resnet18()
-    state_dict = torch.load("model_82.17.pth")
-    model.load_state_dict(state_dict)
+
+    if args.module:
+        model_name = args.module.split("@")[1]
+        thread_model = args.module.split("@")[0]
+        model = robustbench.utils.load_model(model_name=model_name, threat_model=thread_model, dataset="cifar10")
+    else:  
+        # use one of my own, for testing purposes.  
+        model = torchvision.models.resnet18()
+        state_dict = torch.load("model_82.17.pth")
+        model.load_state_dict(state_dict)
     model.eval()
 
     supported_layers_per_fault_target = get_supported_layers_per_fault_target(model)
@@ -150,7 +164,7 @@ if __name__ == "__main__":
         fault_distrubution_per_target = fault_model.fault_distrubution_per_target
         target_bits = ''.join(str(bit) for bit in fault_model.target_bits)
         worker_id = i
-        args = [
+        proc_args = [
             "python3", "worker.py", "--layer_name", layer_name, "--fault_target", fault_target,
             "--num_faults", str(num_faults), "--num_bits_to_flip", str(num_bits_to_flip),
             "--fault_distribution", fault_distribution, "--fault_mode_per_target", fault_mode_per_target,
@@ -158,8 +172,12 @@ if __name__ == "__main__":
             "--number_of_iterations_per_fault_model", str(number_of_iterations_per_fault_model), "--worker_id", str(worker_id)
         ]
         if len(fault_model.target_bits) != 0:
-            args += ["--target_bits", *target_bits]
-        proc = subprocess.Popen(args=args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            proc_args += ["--target_bits", *target_bits]
+        if args.module:
+            proc_args += ["--module", args.module]
+        if args.output_dir:
+            proc_args += ["--output_dir", args.output_dir]
+        proc = subprocess.Popen(args=proc_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         curr_workers.append(proc)
         if len(curr_workers) >= max_workers:
             for j, process in enumerate(curr_workers):
