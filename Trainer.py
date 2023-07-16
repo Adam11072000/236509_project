@@ -185,7 +185,7 @@ class Trainer(abc.ABC):
         dl: DataLoader,
         forward_fn: Callable[[Any], BatchResult],
         verbose=True,
-        max_batches=None,
+        max_batches=1,
     ) -> EpochResult:
         """
         Evaluates the given forward-function on batches from the given

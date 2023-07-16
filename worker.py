@@ -41,6 +41,7 @@ if not os.path.isdir(WORKERS_DIR):
 
 
 if len(args.target_bits) > 0:
+    args.target_bits = args.target_bits[0].split()
     args.target_bits = [int(bit) for bit in args.target_bits]
 
 try:
@@ -66,14 +67,14 @@ def trainSetLoader(batch_size):
         transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
     ])
     testset = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform)
-    testloader = torch.utils.data.DataLoader(testset, batch_size=batch_size, shuffle=True, num_workers=2)
+    testloader = torch.utils.data.DataLoader(testset, batch_size=batch_size, shuffle=False, num_workers=2)
 
     return testloader
 
 if args.module:
-        model_name = args.module.split("@")[1]
-        thread_model = args.module.split("@")[0]
-        model = robustbench.utils.load_model(model_name=model_name, threat_model=thread_model, dataset="cifar10")
+    model_name = args.module.split("@")[1]
+    thread_model = args.module.split("@")[0]
+    model = robustbench.utils.load_model(model_name=model_name, threat_model=thread_model, dataset="cifar10")
 else:  
     # use one of my own, for testing purposes.  
     model = torchvision.models.resnet18()
@@ -86,11 +87,16 @@ lr = 0.00035
 momentum = 0.95
 optimizer = optim.SGD(model.parameters(), lr=lr, momentum=momentum)
 trainer = ResNetTrainer(model, criterion, optimizer, device)
-test_loader = trainSetLoader(32)
+test_loader = trainSetLoader(50)
 
 appened_accuracy = []
 overall_results = {}
+# original model
+trainer2 = ResNetTrainer(model, criterion, optimizer, device)
+num_epochs, train_loss, train_acc, test_loss, test_acc = trainer2.fit(None, test_loader, 1)
 overall_results["fault_mode_%d" % args.worker_id] = copy.deepcopy(fault_model.__dict__())
+overall_results["fault_mode_%d" % args.worker_id]["original_acc"] = test_acc[0]
+
 for i in range(0, args.number_of_iterations_per_fault_model):
     copied = copy.deepcopy(model)
     injector = FaultInjector(copied, fault_model)
@@ -100,6 +106,7 @@ for i in range(0, args.number_of_iterations_per_fault_model):
     appened_accuracy.append(test_acc[0])
 
 overall_results["fault_mode_%d" % args.worker_id]["acc_per_iteration"] = appened_accuracy
+
 with open(TARGET_JSON, "w") as f:
     json.dump(overall_results, f)
     f.close()

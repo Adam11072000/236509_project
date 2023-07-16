@@ -29,6 +29,7 @@ parser.add_argument("-f", "--fault_target", choices=FAULT_TARGET,
 parser.add_argument("--module", type=str, help="modules available at robustBench, provide them as <threat_model>@<model_name>\
                     threat_model = [Linf, L2, corruptions, corruptions_3d]")
 parser.add_argument("--output_dir", type=str, help="Data output directory")
+parser.add_argument("--num_faults", type=int, help="The number of faults.")
 
 # Parse the arguments
 args = parser.parse_args()
@@ -82,6 +83,7 @@ def generate_fault_models(supported_layers_per_fault_target: dict, num_fault_mod
     # targets
     target_choices = np.random.choice(FAULT_TARGET, size=num_fault_models)
     for i in range(0, num_fault_models):
+        # random choosers 
         distribution_target = np.random.choice(RANDOM_DISTRIBUTIONS, size=1)[0]
         distribution_bit_flips = np.random.choice(RANDOM_DISTRIBUTIONS, size=1)[0]
         if distribution_bit_flips == "gaussian":
@@ -90,6 +92,8 @@ def generate_fault_models(supported_layers_per_fault_target: dict, num_fault_mod
         else:
             bit_flips = np.random.uniform(low=lower_bound_bit_flips, 
                         high=upper_bound_bit_flips, size=1)
+        
+        # num faults decisions
         if distribution_target == "gaussian":
             a, b = (lower_bound_fault_num - mean) / std, (upper_bound_fault_num - mean) / std
             num_faults = truncnorm.rvs(a, b, loc=mean, scale=std, size=1)
@@ -97,6 +101,10 @@ def generate_fault_models(supported_layers_per_fault_target: dict, num_fault_mod
             num_faults = np.random.uniform(low=lower_bound_fault_num, # need to support gaussian
                                  high=upper_bound_fault_num, size=1)
         num_faults = int(np.around(num_faults, 0)[0])
+        if args.num_faults:
+            num_faults = args.num_faults
+
+        # bit flips decisions
         bit_flips = int(np.around(bit_flips, 0)[0])
         fault_option = "non-strict" # will do strict later   
         len_target_bits = len(args.target_bits)
@@ -109,14 +117,20 @@ def generate_fault_models(supported_layers_per_fault_target: dict, num_fault_mod
             bit_flips = len_target_bits
             target_bits = args.target_bits
         target_bits = [int(bit) for bit in target_bits]
+
+        #fault target decisions
         fault_target = target_choices[i]
         if args.fault_target is not None:
             fault_target = args.fault_target
+
+        # layer name decisions
         layer_name = np.random.choice(supported_layers_per_fault_target[fault_target], size=1)[0]["module_name"]
         if args.layer_name is not None:
             layer_name = args.layer_name
             if not any(layer["module_name"] == layer_name for layer in supported_layers_per_fault_target[fault_target]):
                 raise WrongParameters("layer_name is not supported with given target")
+        
+        # creation of fault
         fault_models.append(
             FaultModel(
                 layer_name=layer_name,
@@ -162,7 +176,7 @@ if __name__ == "__main__":
         fault_distribution = fault_model.fault_distribution
         fault_mode_per_target = fault_model.fault_mode_per_target
         fault_distrubution_per_target = fault_model.fault_distrubution_per_target
-        target_bits = ''.join(str(bit) for bit in fault_model.target_bits)
+        target_bits = ' '.join(str(bit) for bit in fault_model.target_bits)
         worker_id = i
         proc_args = [
             "python3", "worker.py", "--layer_name", layer_name, "--fault_target", fault_target,
@@ -172,7 +186,7 @@ if __name__ == "__main__":
             "--number_of_iterations_per_fault_model", str(number_of_iterations_per_fault_model), "--worker_id", str(worker_id)
         ]
         if len(fault_model.target_bits) != 0:
-            proc_args += ["--target_bits", *target_bits]
+            proc_args += ["--target_bits", target_bits]
         if args.module:
             proc_args += ["--module", args.module]
         if args.output_dir:
