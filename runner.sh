@@ -16,7 +16,7 @@ runner_generic(){
     python3 tester_conv.py -n 500 -i 15 --target_bits 19 20 21 22 23 --fault_target $target --output_dir fault_number_$target
 
     # fault in relation to fault number, take randomized bits bits
-    python3 tester_conv.py -n 500 -i 15 --fault_target $target --output_dir fault_number_$target
+    python3 tester_conv.py -n 500 -i 15 --fault_target $target --output_dir fault_number_randomized_bits_$target
 
     # in relation to distribution of faults, will contain gaussian and uniform
     python3 tester_conv.py -n 200 -i 25 --target_bits 19 20 21 22 23 --fault_target $target --output_dir distribution_faults_$target --num_faults 20
