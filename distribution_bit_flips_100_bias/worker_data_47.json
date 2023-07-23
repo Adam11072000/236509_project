@@ -1,0 +1,1 @@
+{"fault_target": "bias", "num_faults": 100, "num_bits_to_flip": 6, "fault_distribution": "uniform", "fault_distrubution_per_target": "uniform", "target_bits": [], "layer_name": "bn1", "original_acc": 86.0, "acc_per_iteration": [6.0, 6.0, 8.0, 32.0, 84.0, 24.0, 32.0, 32.0, 6.0, 32.0, 34.0, 6.0, 32.0, 32.0, 54.0, 6.0, 88.0, 32.0, 32.0, 10.0, 32.0, 10.0, 6.0, 32.0, 32.0]}

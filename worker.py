@@ -18,10 +18,8 @@ parser = argparse.ArgumentParser(description="This script initializes a FaultMod
 parser.add_argument("-l", "--layer_name", required=True, help="The name of the layer.")
 parser.add_argument("-f", "--fault_target", default="weight", help="The target of the fault. Default is 'weight'.")
 parser.add_argument("-n", "--num_faults", type=int, default=1, help="The number of faults. Default is 1.")
-parser.add_argument("-o", "--fault_option", default="non-strict", help="The fault option. Default is 'non-strict'.")
 parser.add_argument("-b", "--num_bits_to_flip", type=int, default=1, help="The number of bits to flip. Default is 1.")
 parser.add_argument("-d", "--fault_distribution", default="gaussian", help="The fault distribution. Default is 'gaussian'.")
-parser.add_argument("-m", "--fault_mode_per_target", default="random", help="The fault mode per target. Default is 'random'.")
 parser.add_argument("-p", "--fault_distrubution_per_target", default="gaussian", help="The fault distribution per target. Default is 'gaussian'.")
 parser.add_argument("-t", "--target_bits", nargs='*', default=(), help="The target bits. Provide multiple values separated by space. Default is an empty list.")
 parser.add_argument('-i', '--number_of_iterations_per_fault_model', type=int, default=1,
@@ -48,10 +46,8 @@ try:
     fault_model = FaultModel(layer_name=args.layer_name, 
                         fault_target=args.fault_target, 
                         num_faults=args.num_faults, 
-                        fault_option=args.fault_option, 
                         num_bits_to_flip=args.num_bits_to_flip, 
                         fault_distribution=args.fault_distribution,
-                        fault_mode_per_target=args.fault_mode_per_target,
                         fault_distrubution_per_target=args.fault_distrubution_per_target,
                         target_bits=args.target_bits)
 except WrongParameters as e:
@@ -94,8 +90,8 @@ overall_results = {}
 # original model
 trainer2 = ResNetTrainer(model, criterion, optimizer, device)
 num_epochs, train_loss, train_acc, test_loss, test_acc = trainer2.fit(None, test_loader, 1)
-overall_results["fault_mode_%d" % args.worker_id] = copy.deepcopy(fault_model.__dict__())
-overall_results["fault_mode_%d" % args.worker_id]["original_acc"] = test_acc[0]
+overall_results = copy.deepcopy(fault_model.__dict__())
+overall_results["original_acc"] = test_acc[0]
 
 for i in range(0, args.number_of_iterations_per_fault_model):
     copied = copy.deepcopy(model)
@@ -105,7 +101,7 @@ for i in range(0, args.number_of_iterations_per_fault_model):
     num_epochs, train_loss, train_acc, test_loss, test_acc = trainer2.fit(None, test_loader, 1)
     appened_accuracy.append(test_acc[0])
 
-overall_results["fault_mode_%d" % args.worker_id]["acc_per_iteration"] = appened_accuracy
+overall_results["acc_per_iteration"] = appened_accuracy
 
 with open(TARGET_JSON, "w") as f:
     json.dump(overall_results, f)

@@ -4,8 +4,6 @@ from utils import bitwise_xor_on_floats, generate_random_indices, generate_xor_m
 
 
 FAULT_TARGET = ["weight", "bias", "memory"] # also need number of cells to inject fault into
-FAULT_OPTIONS = ["strict", "non-strict"] # strict indicates 1 bit, non-strict indicates multiple bit flips
-FAULT_MODE_PER_TARGET = ["random", "deterministic"] # fault type on data, either random faults across the martrices or deterministic faults
 RANDOM_DISTRIBUTIONS = ["gaussian", "uniform"]  #  geometric
 
 class WrongParameters(Exception):
@@ -17,31 +15,24 @@ class WrongParameters(Exception):
 
 
 class FaultModel():
-    def __init__(self, layer_name, fault_target="weight", num_faults=1, fault_option="strict", num_bits_to_flip=1, fault_distribution="gaussian",
-                     fault_mode_per_target="random", fault_distrubution_per_target="gaussian", target_bits=[]) -> None:
+    def __init__(self, layer_name, fault_target="weight", num_faults=1, num_bits_to_flip=1, fault_distribution="gaussian", fault_distrubution_per_target="gaussian", target_bits=[]) -> None:
         if layer_name is None:
             raise WrongParameters("layer_name is not provided")
         if not fault_target or not fault_target in FAULT_TARGET:
             raise WrongParameters("fault_target parameter is wrong")
-        if not fault_option in FAULT_OPTIONS or fault_option == "non-strict" and num_bits_to_flip == 1:
-            raise WrongParameters("fault_option parameter or num_faults are wrong")
-        if not fault_mode_per_target in FAULT_MODE_PER_TARGET or fault_mode_per_target == "deterministic" and len(target_bits) == 0:
-            raise WrongParameters("fault_mode_per_target parameter or target_bits are wrong")
         self.fault_target = fault_target
         self.num_faults = num_faults
-        self.fault_option = fault_option
         self.num_bits_to_flip = num_bits_to_flip
         self.fault_distribution = fault_distribution
         self.fault_distrubution_per_target = fault_distrubution_per_target
         self.target_bits = list(map(int, target_bits)) if len(target_bits) > 0 else target_bits
-        self.fault_mode_per_target = fault_mode_per_target
         self.layer_name = layer_name
         self.done = False
     
     def __str__(self) -> str:
-        representation = "layer-name_%s/%s/num-aults_%s/%s/bits-to-flip_%s/distribution_%s/target-mode_%s" % (self.layer_name, self.fault_target, 
-                            self.num_faults, self.fault_option, self.num_bits_to_flip, self.fault_distribution, self.fault_mode_per_target)
-        if self.fault_mode_per_target == "random":
+        representation = "layer-name_%s/%s/num-faults_%s/bits-to-flip_%s/distribution_%s" % (self.layer_name, self.fault_target, 
+                            self.num_faults, self.num_bits_to_flip, self.fault_distribution)
+        if len(self.target_bits) == 0:
             representation = representation + "/target-distribution_%s" % self.fault_distrubution_per_target
         else:
             representation = representation + "/target-bits_%s" % self.target_bits
@@ -51,12 +42,10 @@ class FaultModel():
         return {
             "fault_target": self.fault_target,
             "num_faults": self.num_faults,
-            "fault_option": self.fault_option,
             "num_bits_to_flip": self.num_bits_to_flip,
             "fault_distribution": self.fault_distribution,
             "fault_distrubution_per_target": self.fault_distrubution_per_target,
             "target_bits": self.target_bits,
-            "fault_mode_per_target": self.fault_mode_per_target,
             "layer_name": self.layer_name
         }
 

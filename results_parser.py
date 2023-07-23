@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import os
 import numpy as np
 
+OUTPUT_FIGS_DIR = "./output_figures"
 
 def plot_results(data: dict, name: str, sorting_key):
     plt.figure(figsize=(10,6))
@@ -29,7 +30,9 @@ def plot_results(data: dict, name: str, sorting_key):
     plt.legend()
 
     name = name.replace(" ", "_")
-    plt.savefig(f'{name}.png')
+    if not os.path.isdir(OUTPUT_FIGS_DIR):
+        os.mkdir(OUTPUT_FIGS_DIR)
+    plt.savefig(os.path.join(f"{OUTPUT_FIGS_DIR}/{name}.png"))
 
 
 def parse_results(target_dir: str, target_key):

@@ -1,0 +1,1 @@
+{"fault_target": "weight", "num_faults": 100, "num_bits_to_flip": 5, "fault_distribution": "uniform", "fault_distrubution_per_target": "gaussian", "target_bits": [], "layer_name": "conv1", "original_acc": 86.0, "acc_per_iteration": [86.0, 82.0, 84.0, 82.0, 86.0, 84.0, 86.0, 6.0, 86.0, 84.0, 86.0, 84.0, 84.0, 84.0, 84.0, 84.0, 84.0, 80.0, 84.0, 84.0, 84.0, 82.0, 86.0, 86.0, 80.0]}
