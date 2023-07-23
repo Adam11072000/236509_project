@@ -7,7 +7,7 @@ import numpy as np
 import subprocess
 import argparse
 import robustbench
-import pprint
+import os
 
 
 # Add the arguments
@@ -27,7 +27,7 @@ parser.add_argument("--module", type=str, help="modules available at robustBench
                     threat_model = [Linf, L2, corruptions, corruptions_3d]")
 parser.add_argument("--output_dir", type=str, help="Data output directory")
 parser.add_argument("--num_faults", type=int, help="The number of faults.")
-#parser.add_argument("-i", "--interactive", action='store_true', help="Interactive fault model choosing")
+parser.add_argument("--interactive", action='store_true', help="Interactive fault model choosing")
 
 # Parse the arguments
 args = parser.parse_args()
@@ -39,9 +39,13 @@ if args.number_of_fault_models < 1:
 if args.number_of_iterations_per_fault < 1:
     parser.error("number_of_iterations_per_fault must be higher than 0")
 
-
-
 device = "cuda" if torch.cuda.is_available() else "cpu"
+
+def pretty_print_supported_layers(layers_dict):
+    for main_key in layers_dict:
+        print(f"{main_key}:")
+        for sub_dict in layers_dict[main_key]:
+            print(f"\t{sub_dict['module_name']}")
 
 def get_supported_layers_per_fault_target(model: torch.nn.Module):
     sub_modules = build_module_dict(model)
@@ -56,7 +60,6 @@ def get_supported_layers_per_fault_target(model: torch.nn.Module):
         if hasattr(module, "bias") and module.bias is not None:
             supported_layers_per_fault_target["bias"].append({"module_name": module_name, "module": module})
         supported_layers_per_fault_target["memory"].append({"module_name": module_name, "module": module})
-    pprint.pprint(supported_layers_per_fault_target)
     return supported_layers_per_fault_target    
 
 
@@ -113,10 +116,15 @@ def generate_fault_models(supported_layers_per_fault_target: dict, num_fault_mod
 
         # layer name decisions
         layer_name = np.random.choice(supported_layers_per_fault_target[fault_target], size=1)[0]["module_name"]
-        if args.layer_name is not None:
+        if args.layer_name is not None and not args.interactive:
             layer_name = args.layer_name
             if not any(layer["module_name"] == layer_name for layer in supported_layers_per_fault_target[fault_target]):
                 raise WrongParameters("layer_name is not supported with given target")
+        if args.interactive:
+            module_names = [sub_dict['module_name'] for sub_dict in supported_layers_per_fault_target[fault_target]]
+            print("Please enter a layer name from below:")
+            print(f"{fault_target}: {' '.join(module_names)}")
+            layer_name = input()
             
         
         # creation of fault

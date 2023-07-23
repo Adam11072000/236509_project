@@ -67,6 +67,9 @@ def trainSetLoader(batch_size):
 
     return testloader
 
+print(fault_model.__str__())
+
+
 if args.module:
     model_name = args.module.split("@")[1]
     thread_model = args.module.split("@")[0]
@@ -77,6 +80,7 @@ else:
     state_dict = torch.load("model_82.17.pth")
     model.load_state_dict(state_dict)
 model.eval()
+
 
 criterion = nn.CrossEntropyLoss()
 lr = 0.00035
