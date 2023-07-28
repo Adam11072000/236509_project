@@ -50,7 +50,7 @@ if [[ "$FAULT_TARGET" != "weight" && "$FAULT_TARGET" != "bias" && "$FAULT_TARGET
 fi
 
 
-(){
+fault_number_models(){
     layer_name=$1
     # fixed bits
     python3 run_injector.py -n 500 -i 15 --target_bits 19 20 21 22 23 --fault_target $FAULT_TARGET --output_dir fault_number_$FAULT_TARGET"_$layer_name" --layer_name $layer_name
