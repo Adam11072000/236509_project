@@ -6,7 +6,7 @@ usage() {
   echo
   echo "Options:"
   echo "  -t  Fault target, choose from weight, bias, or memory."
-  echo "  -m  Comma-separated list of fault models, choose from fault_number_models, distribution_bit_flips_models, or distribution_faults_models."
+  echo "  -m  Comma-separated list of fault models, choose from fault_number_models, distribution_bit_flips_models,distribution_faults_models or bits_granularity_models."
   echo " -l target layer name in network"
   echo "  -h  Display this help message."
   exit 1
@@ -73,6 +73,14 @@ distribution_faults_models(){
     python3 run_injector.py -n 200 -i 25 --target_bits 19 20 21 22 23 --fault_target $FAULT_TARGET --output_dir distribution_faults_$FAULT_TARGET"_$layer_name" --num_faults 20 --layer_name $layer_name
 }
 
+bits_granularity_models(){
+    layer_name=$1 
+
+    python3 run_injector.py -n 100 -i 25 --target_bits 10 11 12 13 14 --fault_target $FAULT_TARGET --output_dir middle_bits_$FAULT_TARGET"_$layer_name" --num_faults 20 --layer_name $layer_name
+    python3 run_injector.py -n 100 -i 25 --target_bits 1 2 3 4 5 6 --fault_target $FAULT_TARGET --output_dir low_bits_$FAULT_TARGET"_$layer_name" --num_faults 20 --layer_name $layer_name
+    python3 run_injector.py -n 100 -i 25 --target_bits 19 20 21 22 23 --fault_target $FAULT_TARGET --output_dir high_bits_$FAULT_TARGET"_$layer_name" --num_faults 20 --layer_name $layer_name
+}
+
 
 for MODEL in "${FAULT_MODELS[@]}"; do
   if declare -f $MODEL > /dev/null; then
@@ -80,7 +88,7 @@ for MODEL in "${FAULT_MODELS[@]}"; do
       eval "$MODEL $layer_name"
     done
   else
-    echo "Invalid fault model: $MODEL. Choose from fault_number_models, distribution_bit_flips_models, or distribution_faults_models."
+    echo "Invalid fault model: $MODEL. Choose from fault_number_models, distribution_bit_flips_models,distribution_faults_models or bits_granularity_models."
     exit 1
   fi
 done
