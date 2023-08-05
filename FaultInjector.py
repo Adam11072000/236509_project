@@ -25,7 +25,7 @@ class FaultModel():
         self.num_bits_to_flip = num_bits_to_flip
         self.fault_distribution = fault_distribution
         self.fault_distrubution_per_target = fault_distrubution_per_target
-        self.target_bits = list(map(int, target_bits)) if len(target_bits) > 0 else target_bits
+        self.target_bits = target_bits
         self.layer_name = layer_name
         self.done = False
     
@@ -35,7 +35,7 @@ class FaultModel():
         if len(self.target_bits) == 0:
             representation = representation + "/target-distribution_%s" % self.fault_distrubution_per_target
         else:
-            representation = representation + "/target-bits_%s" % self.target_bits
+            representation = representation + "/target-bits_%s" % '-'.join([str(i) for i in self.target_bits])
         return representation
 
     def __dict__(self) -> dict:

@@ -2,12 +2,10 @@ import torchvision
 import torch
 from utils import build_module_dict
 from FaultInjector import FaultModel, FAULT_TARGET, RANDOM_DISTRIBUTIONS, WrongParameters
-from scipy.stats import truncnorm
 import numpy as np
 import subprocess
 import argparse
 import robustbench
-import os
 
 
 # Add the arguments
@@ -40,7 +38,15 @@ if args.number_of_fault_models < 1:
 if args.number_of_iterations_per_fault < 1:
     parser.error("number_of_iterations_per_fault must be higher than 0")
 
-device = "cuda" if torch.cuda.is_available() else "cpu"
+if torch.cuda.is_available():
+    device = "cuda"
+elif torch.backends.mps.is_available():
+    device = "mps"
+else:
+    device = "cpu"
+
+print(f"Using {device}")
+
 
 def pretty_print_supported_layers(layers_dict):
     for main_key in layers_dict:
@@ -70,11 +76,9 @@ def generate_fault_models(supported_layers_per_fault_target: dict, num_fault_mod
     # fault target
     lower_bound_fault_num = 0
     upper_bound_fault_num = num_fault_models
-    std = 2
-    mean = 5
     
     # bit flips
-    lower_bound_bit_flips = 2
+    lower_bound_bit_flips = 1
     upper_bound_bit_flips = 7
     
     # targets
@@ -85,41 +89,30 @@ def generate_fault_models(supported_layers_per_fault_target: dict, num_fault_mod
         if args.distribution_faults:
             distribution_target = args.distribution_faults
         distribution_bit_flips = np.random.choice(RANDOM_DISTRIBUTIONS, size=1)[0]
-        if distribution_bit_flips == "gaussian":
-            a, b = (lower_bound_bit_flips - mean) / std, (upper_bound_bit_flips - mean) / std
-            bit_flips = truncnorm.rvs(a, b, loc=mean, scale=std, size=1)
+
+        target_bits = []
+        if args.target_bits:
+            bit_flips = len(args.target_bits)
+            target_bits = args.target_bits
         else:
-            bit_flips = np.random.uniform(low=lower_bound_bit_flips, 
-                        high=upper_bound_bit_flips, size=1)
+            bit_flips = int(np.around(np.random.uniform(low=lower_bound_bit_flips, 
+                        high=upper_bound_bit_flips, size=1), 0)[0])
+        target_bits = [int(bit) for bit in target_bits]   
         
-        # num faults decisions
-        if distribution_target == "gaussian":
-            a, b = (lower_bound_fault_num - mean) / std, (upper_bound_fault_num - mean) / std
-            num_faults = truncnorm.rvs(a, b, loc=mean, scale=std, size=1)
-        else:
-            num_faults = np.random.uniform(low=lower_bound_fault_num, # need to support gaussian
-                                 high=upper_bound_fault_num, size=1)
-        num_faults = int(np.around(num_faults, 0)[0])
         if args.num_faults:
             num_faults = args.num_faults
-
-        # bit flips decisions
-        bit_flips = int(np.around(bit_flips, 0)[0])
-        len_target_bits = len(args.target_bits)
-        target_bits = []
-        if len_target_bits > 0:
-            bit_flips = len_target_bits
-            target_bits = args.target_bits
-        target_bits = [int(bit) for bit in target_bits]
+        else:
+            num_faults = int(np.around(np.random.uniform(low=lower_bound_fault_num,
+                                 high=upper_bound_fault_num, size=1), 0)[0])
 
         #fault target decisions
         fault_target = target_choices[i]
-        if args.fault_target is not None:
+        if args.fault_target:
             fault_target = args.fault_target
 
         # layer name decisions
         layer_name = np.random.choice(supported_layers_per_fault_target[fault_target], size=1)[0]["module_name"]
-        if args.layer_name is not None and not args.interactive:
+        if args.layer_name and not args.interactive:
             layer_name = args.layer_name
             if not any(layer["module_name"] == layer_name for layer in supported_layers_per_fault_target[fault_target]):
                 raise WrongParameters("layer_name is not supported with given target")
@@ -128,7 +121,6 @@ def generate_fault_models(supported_layers_per_fault_target: dict, num_fault_mod
             print("Please enter a layer name from below:")
             print(f"{fault_target}: {' '.join(module_names)}")
             layer_name = input()
-            
         
         # creation of fault
         fault_models.append(
@@ -157,9 +149,9 @@ if __name__ == "__main__":
     else:  
         # use one of my own, for testing purposes.  
         model = torchvision.models.resnet18()
-        #state_dict = torch.load("model_82.17.pth")
-        #model.load_state_dict(state_dict)
-        model = torchvision.models.resnet18(torchvision.models.ResNet18_Weights.DEFAULT)
+        state_dict = torch.load("model_82.17.pth", map_location=device)
+        model.load_state_dict(state_dict)
+        # model = torchvision.models.resnet18(torchvision.models.ResNet18_Weights.DEFAULT)
     model.eval()
 
     supported_layers_per_fault_target = get_supported_layers_per_fault_target(model)
@@ -194,15 +186,19 @@ if __name__ == "__main__":
         curr_workers.append(proc)
         if len(curr_workers) >= max_workers:
             for j, process in enumerate(curr_workers):
-                print("waiting for process %d" % (j + 10 * ((i - 1) / 10)))
+                print("waiting for process %d" % (j + 10 * (i / 10)))
                 stdout, stderr = process.communicate()
                 print(stdout.decode())
                 print(stderr.decode())
+                proc.stdout.close()
+                proc.stderr.close()
             curr_workers = []
     for proc in curr_workers:
         stdout, stderr = proc.communicate()
         print(stdout.decode())
         print(stderr.decode())
+        proc.stdout.close()
+        proc.stderr.close()
 
         
 

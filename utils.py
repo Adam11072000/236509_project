@@ -71,11 +71,11 @@ def generate_random_indices(tensor_shape, cap, distribution='uniform'):
 
 def float_to_int32(tensor):
     tensor_as_int = np.frombuffer(tensor.cpu().detach().numpy().tobytes(), dtype=np.int32)
-    return torch.tensor(tensor_as_int, dtype=torch.int32).to(device)
+    return torch.tensor(tensor_as_int, dtype=torch.int).to(device)
 
 def int32_to_float(tensor):
     tensor_as_float = np.frombuffer(tensor.cpu().detach().numpy().tobytes(), dtype=np.float32)
-    return torch.tensor(tensor_as_float, dtype=torch.float32).to(device)
+    return torch.tensor(tensor_as_float, dtype=torch.float).to(device)
 
 def bitwise_xor_on_floats(target_indices, target, xor_mask):
     tmp = target.clone()

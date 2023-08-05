@@ -21,7 +21,7 @@ parser.add_argument("-n", "--num_faults", type=int, default=1, help="The number 
 parser.add_argument("-b", "--num_bits_to_flip", type=int, default=1, help="The number of bits to flip. Default is 1.")
 parser.add_argument("-d", "--fault_distribution", default="gaussian", help="The fault distribution. Default is 'gaussian'.")
 parser.add_argument("-p", "--fault_distrubution_per_target", default="gaussian", help="The fault distribution per target. Default is 'gaussian'.")
-parser.add_argument("-t", "--target_bits", nargs='*', default=(), help="The target bits. Provide multiple values separated by space. Default is an empty list.")
+parser.add_argument("-t", "--target_bits", nargs='*', default=[], help="The target bits. Provide multiple values separated by space. Default is an empty list.")
 parser.add_argument('-i', '--number_of_iterations_per_fault_model', type=int, default=1,
                     help='Number of iterations per fault (must be higher than 0)')
 parser.add_argument('-id', '--worker_id', type=int, required=True,
@@ -54,7 +54,12 @@ except WrongParameters as e:
     print(e)
 
 
-device = "cuda" if torch.cuda.is_available() else "cpu"
+if torch.cuda.is_available():
+    device = "cuda"
+elif torch.backends.mps.is_available():
+    device = "mps"
+else:
+    device = "cpu"
 
 def trainSetLoader(batch_size):
     # Define transformation for the test images
@@ -78,11 +83,10 @@ if __name__ == "__main__":
     else:  
         # use one of my own, for testing purposes.  
         model = torchvision.models.resnet18()
-        #state_dict = torch.load("model_82.17.pth")
-        #model.load_state_dict(state_dict)
-        model.eval()
+        state_dict = torch.load("model_82.17.pth", map_location=device)
+        model.load_state_dict(state_dict)
 
-    model = torchvision.models.resnet18(torchvision.models.ResNet18_Weights.DEFAULT)
+    # model = torchvision.models.resnet18(torchvision.models.ResNet18_Weights.DEFAULT)
     model.eval()
     criterion = nn.CrossEntropyLoss()
     lr = 0.00035
@@ -94,12 +98,12 @@ if __name__ == "__main__":
     appened_accuracy = []
     overall_results = {}
     # original model
-    print("hi2")
+    # print("hi2")
     trainer2 = ResNetTrainer(model, criterion, optimizer, device)
     num_epochs, train_loss, train_acc, test_loss, test_acc = trainer2.fit(None, test_loader, 1)
     overall_results = copy.deepcopy(fault_model.__dict__())
     overall_results["original_acc"] = test_acc[0]
-    print("hi")
+    # print("hi")
 
     for i in range(0, args.number_of_iterations_per_fault_model):
         copied = copy.deepcopy(model)
