@@ -6,7 +6,7 @@ import numpy as np
 import subprocess
 import argparse
 import robustbench
-
+import os
 
 # Add the arguments
 parser = argparse.ArgumentParser(description='Arguments for the script. For the list of available models, check https://github.com/RobustBench/robustbench')
@@ -180,6 +180,8 @@ if __name__ == "__main__":
         if args.module:
             proc_args += ["--module", args.module]
         if args.output_dir:
+            if not os.path.isdir(args.output_dir):
+                os.makedirs(args.output_dir)
             proc_args += ["--output_dir", args.output_dir]
         print(' '.join(proc_args))
         proc = subprocess.Popen(args=proc_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
