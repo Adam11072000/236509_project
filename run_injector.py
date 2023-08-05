@@ -28,6 +28,7 @@ parser.add_argument("--module", type=str, help="modules available at robustBench
 parser.add_argument("--output_dir", type=str, help="Data output directory")
 parser.add_argument("--num_faults", type=int, help="The number of faults.")
 parser.add_argument("--interactive", action='store_true', help="Interactive fault model choosing")
+parser.add_argument("-d", "--distribution_faults", type=str, help="Distribution of faults", choices=RANDOM_DISTRIBUTIONS)
 
 # Parse the arguments
 args = parser.parse_args()
@@ -81,6 +82,8 @@ def generate_fault_models(supported_layers_per_fault_target: dict, num_fault_mod
     for i in range(0, num_fault_models):
         # random choosers 
         distribution_target = np.random.choice(RANDOM_DISTRIBUTIONS, size=1)[0]
+        if args.distribution_faults:
+            distribution_target = args.distribution_faults
         distribution_bit_flips = np.random.choice(RANDOM_DISTRIBUTIONS, size=1)[0]
         if distribution_bit_flips == "gaussian":
             a, b = (lower_bound_bit_flips - mean) / std, (upper_bound_bit_flips - mean) / std
@@ -154,8 +157,9 @@ if __name__ == "__main__":
     else:  
         # use one of my own, for testing purposes.  
         model = torchvision.models.resnet18()
-        state_dict = torch.load("model_82.17.pth")
-        model.load_state_dict(state_dict)
+        #state_dict = torch.load("model_82.17.pth")
+        #model.load_state_dict(state_dict)
+        model = torchvision.models.resnet18(torchvision.models.ResNet18_Weights.DEFAULT)
     model.eval()
 
     supported_layers_per_fault_target = get_supported_layers_per_fault_target(model)
@@ -185,6 +189,7 @@ if __name__ == "__main__":
             proc_args += ["--module", args.module]
         if args.output_dir:
             proc_args += ["--output_dir", args.output_dir]
+        print(' '.join(proc_args))
         proc = subprocess.Popen(args=proc_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         curr_workers.append(proc)
         if len(curr_workers) >= max_workers:

@@ -11,13 +11,16 @@ def plot_results(data: dict, name: str):
     fig.suptitle(f"{generic_fault_model}_{fault_target}")
     for fault_place_in_nn, distributions in data.items():
         for ax, (distribution, workers_data) in zip(axs, distributions.items()):
-            avg_values = [np.mean(worker_data["acc_per_iteration"]) for worker_data in workers_data]
+            sorted_list_of_dicts = sorted(workers_data, key=lambda x: x['num_faults'])
+            avg_values = [np.mean(worker_data["acc_per_iteration"]) for worker_data in sorted_list_of_dicts]
             x = range(len(avg_values))
             ax.plot(x, avg_values, label=fault_place_in_nn)
             ax.set_title(distribution)
     for ax in axs:
         ax.legend()
         ax.grid(True)
+        ax.set_xlabel("Faults")
+        ax.set_ylabel("Accuracy")
     # Show the figure
     plt.savefig(f"./output_figures/{name}")
 

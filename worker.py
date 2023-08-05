@@ -67,48 +67,51 @@ def trainSetLoader(batch_size):
 
     return testloader
 
-print(fault_model.__str__())
 
 
-if args.module:
-    model_name = args.module.split("@")[1]
-    thread_model = args.module.split("@")[0]
-    model = robustbench.utils.load_model(model_name=model_name, threat_model=thread_model, dataset="cifar10")
-else:  
-    # use one of my own, for testing purposes.  
-    model = torchvision.models.resnet18()
-    state_dict = torch.load("model_82.17.pth")
-    model.load_state_dict(state_dict)
-model.eval()
+if __name__ == "__main__":
+    print(fault_model.__str__())
+    if args.module:
+        model_name = args.module.split("@")[1]
+        thread_model = args.module.split("@")[0]
+        model = robustbench.utils.load_model(model_name=model_name, threat_model=thread_model, dataset="cifar10")
+    else:  
+        # use one of my own, for testing purposes.  
+        model = torchvision.models.resnet18()
+        #state_dict = torch.load("model_82.17.pth")
+        #model.load_state_dict(state_dict)
+        model.eval()
 
+    model = torchvision.models.resnet18(torchvision.models.ResNet18_Weights.DEFAULT)
+    model.eval()
+    criterion = nn.CrossEntropyLoss()
+    lr = 0.00035
+    momentum = 0.95
+    optimizer = optim.SGD(model.parameters(), lr=lr, momentum=momentum)
+    trainer = ResNetTrainer(model, criterion, optimizer, device)
+    test_loader = trainSetLoader(50)
 
-criterion = nn.CrossEntropyLoss()
-lr = 0.00035
-momentum = 0.95
-optimizer = optim.SGD(model.parameters(), lr=lr, momentum=momentum)
-trainer = ResNetTrainer(model, criterion, optimizer, device)
-test_loader = trainSetLoader(50)
-
-appened_accuracy = []
-overall_results = {}
-# original model
-trainer2 = ResNetTrainer(model, criterion, optimizer, device)
-num_epochs, train_loss, train_acc, test_loss, test_acc = trainer2.fit(None, test_loader, 1)
-overall_results = copy.deepcopy(fault_model.__dict__())
-overall_results["original_acc"] = test_acc[0]
-
-for i in range(0, args.number_of_iterations_per_fault_model):
-    copied = copy.deepcopy(model)
-    injector = FaultInjector(copied, fault_model)
-    injector.inject_faults()
-    trainer2 = ResNetTrainer(injector.model, criterion, optimizer, device)
+    appened_accuracy = []
+    overall_results = {}
+    # original model
+    print("hi2")
+    trainer2 = ResNetTrainer(model, criterion, optimizer, device)
     num_epochs, train_loss, train_acc, test_loss, test_acc = trainer2.fit(None, test_loader, 1)
-    appened_accuracy.append(test_acc[0])
+    overall_results = copy.deepcopy(fault_model.__dict__())
+    overall_results["original_acc"] = test_acc[0]
+    print("hi")
 
-overall_results["acc_per_iteration"] = appened_accuracy
+    for i in range(0, args.number_of_iterations_per_fault_model):
+        copied = copy.deepcopy(model)
+        injector = FaultInjector(copied, fault_model)
+        injector.inject_faults()
+        trainer2 = ResNetTrainer(injector.model, criterion, optimizer, device)
+        num_epochs, train_loss, train_acc, test_loss, test_acc = trainer2.fit(None, test_loader, 1)
+        appened_accuracy.append(test_acc[0])
 
-with open(TARGET_JSON, "w") as f:
-    json.dump(overall_results, f)
-    f.close()
+    overall_results["acc_per_iteration"] = appened_accuracy
 
-exit(0)
+    with open(TARGET_JSON, "w") as f:
+        json.dump(overall_results, f)
+        f.close()
+
