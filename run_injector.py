@@ -27,6 +27,7 @@ parser.add_argument("--output_dir", type=str, help="Data output directory")
 parser.add_argument("--num_faults", type=int, help="The number of faults.")
 parser.add_argument("--interactive", action='store_true', help="Interactive fault model choosing")
 parser.add_argument("-d", "--distribution_faults", type=str, help="Distribution of faults", choices=RANDOM_DISTRIBUTIONS)
+parser.add_argument("--force", action="store_true", help="force run regardless if output dir is present")
 
 # Parse the arguments
 args = parser.parse_args()
@@ -44,6 +45,9 @@ elif torch.backends.mps.is_available():
     device = "mps"
 else:
     device = "cpu"
+
+if not args.force and args.output_dir and os.path.isdir(args.output_dir):
+    exit(0)
 
 print(f"Using {device}")
 
