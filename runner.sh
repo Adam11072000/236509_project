@@ -55,17 +55,17 @@ fault_number_models(){
     layer_name=$1
     # fixed bits
     python3 run_injector.py -n 50 -i 100 --target_bits 19 20 21 22 23 --fault_target $FAULT_TARGET\
-        --output_dir fault_number_$FAULT_TARGET"_$layer_name" --layer_name $layer_name --distribution $DISTRIB
+        --output_dir fault_number_$FAULT_TARGET"_$layer_name""_$DISTRIB" --layer_name $layer_name --distribution $DISTRIB
 
     #randomized bits
     python3 run_injector.py -n 50 -i 100 --fault_target $FAULT_TARGET\
-        --output_dir fault_number_randomized_bits_$FAULT_TARGET"_$layer_name" --layer_name $layer_name --distribution $DISTRIB
+        --output_dir fault_number_randomized_bits_$FAULT_TARGET"_$layer_name""_$DISTRIB" --layer_name $layer_name --distribution $DISTRIB
 }
 
 distribution_bit_flips_models(){
     layer_name=$1
     python3 run_injector.py -n 50 -i 100 --fault_target $FAULT_TARGET\
-        --output_dir distribution_bit_flips_20_$FAULT_TARGET"_$layer_name" --num_faults 20 --layer_name $layer_name --distribution $DISTRIB
+        --output_dir distribution_bit_flips_20_$FAULT_TARGET"_$layer_name""_$DISTRIB" --num_faults 20 --layer_name $layer_name --distribution $DISTRIB
 }
 
 distribution_faults_models(){
@@ -82,23 +82,23 @@ bits_granularity_models(){
 
     # mantissa bits
     python3 run_injector.py -n 50 -i 100 --target_bits 10 11 12 13 14 --fault_target $FAULT_TARGET\
-        --output_dir middle_bits_mantissa_$FAULT_TARGET"_$layer_name" --num_faults 20 --layer_name $layer_name --distribution $DISTRIB
+        --output_dir middle_bits_mantissa_$FAULT_TARGET"_$layer_name""_$DISTRIB" --num_faults 20 --layer_name $layer_name --distribution $DISTRIB
     python3 run_injector.py -n 50 -i 100 --target_bits 0 1 2 3 4 5 --fault_target $FAULT_TARGET\
-        --output_dir low_bits_mantissa_$FAULT_TARGET"_$layer_name" --num_faults 20 --layer_name $layer_name --distribution $DISTRIB
+        --output_dir low_bits_mantissa_$FAULT_TARGET"_$layer_name""_$DISTRIB" --num_faults 20 --layer_name $layer_name --distribution $DISTRIB
     python3 run_injector.py -n 50 -i 100 --target_bits 19 20 21 22 23 --fault_target $FAULT_TARGET\
-        --output_dir high_bits_mantissa_$FAULT_TARGET"_$layer_name" --num_faults 20 --layer_name $layer_name --distribution $DISTRIB
+        --output_dir high_bits_mantissa_$FAULT_TARGET"_$layer_name""_$DISTRIB" --num_faults 20 --layer_name $layer_name --distribution $DISTRIB
 
     # exponent bits
     python3 run_injector.py -n 50 -i 100 --target_bits 29 30 --fault_target $FAULT_TARGET\
-        --output_dir high_bits_exponent_$FAULT_TARGET"_$layer_name" --num_faults 20 --layer_name $layer_name --distribution $DISTRIB
+        --output_dir high_bits_exponent_$FAULT_TARGET"_$layer_name""_$DISTRIB" --num_faults 20 --layer_name $layer_name --distribution $DISTRIB
     python3 run_injector.py -n 50 -i 100 --target_bits 24 25 --fault_target $FAULT_TARGET\
-        --output_dir low_bits_exponent_$FAULT_TARGET"_$layer_name" --num_faults 20 --layer_name $layer_name --distribution $DISTRIB
+        --output_dir low_bits_exponent_$FAULT_TARGET"_$layer_name""_$DISTRIB" --num_faults 20 --layer_name $layer_name --distribution $DISTRIB
     python3 run_injector.py -n 50 -i 100 --target_bits 27 28 --fault_target $FAULT_TARGET\
-        --output_dir middle_bits_exponent_$FAULT_TARGET"_$layer_name" --num_faults 20 --layer_name $layer_name --distribution $DISTRIB
+        --output_dir middle_bits_exponent_$FAULT_TARGET"_$layer_name""_$DISTRIB" --num_faults 20 --layer_name $layer_name --distribution $DISTRIB
 
     # sign bit
     python3 run_injector.py -n 50 -i 100 --target_bits 31 --fault_target $FAULT_TARGET\
-        --output_dir sign_bit_$FAULT_TARGET"_$layer_name" --num_faults 20 --layer_name $layer_name --distribution $DISTRIB
+        --output_dir sign_bit_$FAULT_TARGET"_$layer_name""_$DISTRIB" --num_faults 20 --layer_name $layer_name --distribution $DISTRIB
 }
 
 
