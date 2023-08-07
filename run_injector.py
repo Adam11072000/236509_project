@@ -47,6 +47,7 @@ else:
     device = "cpu"
 
 if not args.force and args.output_dir and os.path.isdir(args.output_dir):
+    print("Skipping because output dir is present and non-forced run is used")
     exit(0)
 
 print(f"Using {device}")
